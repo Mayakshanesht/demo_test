@@ -7,8 +7,22 @@ ported to Python so the LLM can call it as a tool and always get correct
 
 ACCOUNT = "rwth2125"
 CPUS_PER_GPU = 24
-RAM_PER_GPU = 122  # GB system-RAM share per H100
+RAM_PER_GPU = 122   # GB system-RAM share per H100
+VRAM_PER_GPU = 80   # GB VRAM per H100
 LOGIN_NODE = "login23-1.hpc.itc.rwth-aachen.de"
+
+
+def resource_summary(mode="production", gpus=1, time="04:00:00", devel=False):
+    """Exact resources a request maps to — for tracking (machine, vram, ram, time)."""
+    if mode == "development" and devel:
+        return {"machine": "devel (CPU test)", "partition": "devel", "gpus": 0,
+                "vram_gb": 0, "ram_gb": 8, "cpus": 2, "time": time,
+                "hours": round(_time_hours(time), 2)}
+    g = int(gpus or 1)
+    return {"machine": "c23g · H100", "partition": "c23g", "gpus": g,
+            "vram_gb": g * VRAM_PER_GPU, "ram_gb": g * RAM_PER_GPU,
+            "cpus": g * CPUS_PER_GPU, "time": time,
+            "hours": round(_time_hours(time), 2)}
 
 # --- Safety caps: refuse oversized requests --------------------------------
 MAX_GPUS = 4        # one c23g node = 4 H100; no multi-node here
@@ -184,6 +198,47 @@ SALLOC_TOOL_SCHEMA = {
         },
     },
 }
+
+def generate_dev_script(user="mayur", gpus=1, time="04:00:00", devel=False):
+    """A runnable .sh for DEVELOPMENT: starts an interactive salloc session.
+    Run it directly with ./dev_session.sh — NOT with sbatch."""
+    user = (user or "mayur").lower()
+    if user not in TEAM:
+        raise ValueError(f"unknown user '{user}'. Choose: {', '.join(TEAM)}")
+    uname = TEAM[user][0]
+
+    if devel:
+        _guard(0, time, max_gpus=0, max_hours=MAX_DEVEL_HOURS)
+        salloc = f"salloc -p devel -n 2 -t {time}"
+        head = "devel test (CPU, no GPU, short queue)"
+        gpu_hint = "# (no GPU on devel)"
+    else:
+        gpus = int(gpus)
+        if gpus < 1:
+            raise ValueError("gpus must be at least 1")
+        _guard(gpus, time)
+        cpus = gpus * CPUS_PER_GPU
+        salloc = (f"salloc --account={ACCOUNT} --partition=c23g "
+                  f"--gres=gpu:{gpus} --cpus-per-task={cpus} --time={time}")
+        head = f"interactive H100 session ({gpus} GPU, {gpus*VRAM_PER_GPU} GB VRAM)"
+        gpu_hint = "module load CUDA && nvidia-smi"
+
+    return f"""#!/usr/bin/zsh
+###############################################################################
+# Development session for {user} (HPC user: {uname}) — {head}
+# RUN IT DIRECTLY (interactive):   chmod +x dev_session.sh && ./dev_session.sh
+# Do NOT use sbatch — this is interactive and drops you onto the compute node.
+# Tip: use a FRESH shell; salloc injects SLURM_* vars that linger afterwards.
+###############################################################################
+
+{salloc}
+
+# Once the allocation is granted you are ON the compute node. Then:
+#   {gpu_hint}
+#   ... develop / debug interactively ...
+# Type 'exit' to release the allocation.
+"""
+
 
 TOOL_SCHEMA = {
     "type": "function",

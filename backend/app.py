@@ -58,6 +58,15 @@ class ScaffoldRequest(BaseModel):
     time: str | None = None
 
 
+class GenerateRequest(BaseModel):
+    user: str = "mayur"
+    feature: str = "custom"
+    mode: str = "development"   # development -> salloc ; production -> sbatch
+    devel: bool = False         # development only: 5-min devel-partition test
+    gpus: int | None = None
+    time: str | None = None
+
+
 class BundleRequest(BaseModel):
     feature: str
     user: str = "mayur"
@@ -65,6 +74,8 @@ class BundleRequest(BaseModel):
     time: str | None = None
     remote: str = bundle.DEFAULT_REMOTE
     branch: str | None = None   # defaults to the user's name (per-user branch)
+    label: str | None = None    # optional job label for tracking
+    run_id: str | None = None   # client may supply; else server generates
 
 
 def run_tool(name: str, args: dict) -> str:
@@ -195,14 +206,42 @@ def scaffold(req: ScaffoldRequest):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+@app.post("/api/generate")
+def generate(req: GenerateRequest):
+    """Deterministic, mode-aware: development -> salloc, production -> sbatch."""
+    try:
+        if req.mode == "production":
+            prof = ft.FEATURES.get(req.feature, ft.FEATURES["custom"])
+            gpus = req.gpus or prof["gpus"]
+            time = req.time or prof["time"]
+            script = sg.generate_script(
+                user=req.user, mode="production", gpus=gpus, time=time,
+                job_name=req.feature, command=prof["command"])
+            res = sg.resource_summary("production", gpus, time)
+            return {"kind": "sbatch", "script": script, "resources": res}
+        # development -> a runnable .sh that starts an interactive salloc session
+        gpus = req.gpus or 1
+        time = req.time or ("00:30:00" if req.devel else "04:00:00")
+        script = sg.generate_dev_script(user=req.user, gpus=gpus, time=time, devel=req.devel)
+        res = sg.resource_summary("development", gpus, time, devel=req.devel)
+        return {"kind": "salloc", "script": script, "resources": res}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 @app.post("/api/bundle")
 def make_bundle(req: BundleRequest):
-    """Return a downloadable .zip project folder (job + git-push + pull-run)."""
+    """Return a downloadable .zip run folder (job + git-push + pull-run)."""
     try:
-        name, data = bundle.build_bundle(req.feature, req.user, req.gpus,
-                                         req.time, req.remote, req.branch)
-        return Response(content=data, media_type="application/zip",
-                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        name, data, meta = bundle.build_bundle(
+            req.feature, req.user, req.gpus, req.time, req.remote,
+            req.branch, req.label, req.run_id)
+        headers = {
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "X-Run-Id": meta["run_id"], "X-Label": meta["label"],
+            "Access-Control-Expose-Headers": "X-Run-Id, X-Label",
+        }
+        return Response(content=data, media_type="application/zip", headers=headers)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 

@@ -5,11 +5,15 @@ Pick who you are and the feature you're working on, ask in plain English, and ge
 a **downloadable `.sh`** you can commit to git and run on the RWTH **CLAIX-2023**
 cluster (project `rwth2125`). Each user unlocks it with their own **Groq API key**.
 
-It can:
-- create an interactive **`salloc`** session (development/debugging),
-- generate an **`sbatch`** script (serious data-generation / training),
-- **scaffold a whole feature repo** (tuned resources + Slurm script) from a dropdown,
-- explain **shared storage**, **data transfer**, and **GPU/CUDA/module** commands.
+Four tabs:
+- **Generate** — pick user, feature, mode, GPUs, time → get the right command:
+  - **Development → `salloc`** delivered as a runnable `.sh` you start directly
+    (`chmod +x dev_session.sh && ./dev_session.sh`), *not* sbatch.
+  - **Production → `sbatch run.sh`** for training / longer jobs.
+  - **📦 Download bundle** — a uniquely-named `.zip` run (job + git-push + HPC pull-run).
+- **Assistant** — Groq chat grounded by RAG on the RWTH docs (storage, transfer, modules, GPU/CUDA).
+- **History** — every run you generated: machine, VRAM, RAM, duration, run-id.
+- **Admin** — totals, GPU-hours requested, per-user breakdown, team & caps.
 
 The `#SBATCH` lines come from a deterministic generator exposed to the model as a
 **tool**, so partition (`c23g`), account (`rwth2125`) and sizing are always correct —

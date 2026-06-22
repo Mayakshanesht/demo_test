@@ -3,280 +3,452 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>rwth2125 HPC Assistant</title>
+<title>WestAI HPC Assistant</title>
 <style>
-  :root { --bg:#0f1117; --panel:#181b24; --panel2:#11141c; --accent:#5b8cff;
-          --text:#e6e8ee; --muted:#8b91a3; --border:#262b38; --code:#0b0e14; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-         background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; }
-  header { padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--border);
-           display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0; font-weight:600; }
-  header .sub { color:var(--muted); font-size:12px; }
-  .spacer { flex:1; }
-  select, input { background:var(--panel2); color:var(--text); border:1px solid var(--border);
-                  border-radius:8px; padding:8px 10px; font-size:13px; }
-  input[type=password] { width:240px; }
-  .badge { font-size:11px; color:var(--muted); }
-  #chat { flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:18px; }
-  .msg { max-width:820px; width:100%; margin:0 auto; display:flex; gap:12px; }
-  .msg .who { width:34px; height:34px; border-radius:8px; flex-shrink:0; display:flex;
-              align-items:center; justify-content:center; font-size:13px; font-weight:700; }
-  .user .who { background:#243; color:#9f9; }
-  .bot  .who { background:#234; color:#9cf; }
-  .bubble { background:var(--panel); border:1px solid var(--border); border-radius:10px;
-            padding:12px 16px; line-height:1.55; font-size:14px; overflow-x:auto; }
-  .user .bubble { background:var(--panel2); }
-  pre { background:var(--code); border:1px solid var(--border); border-radius:8px;
-        padding:12px 14px; overflow-x:auto; position:relative; margin:10px 0; }
-  code { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:13px; }
-  .copy, .dl { position:absolute; top:8px; font-size:11px; background:#222a3a;
-          border:1px solid var(--border); color:var(--text); border-radius:6px;
-          padding:3px 8px; cursor:pointer; }
-  .copy { right:8px; } .dl { right:62px; }
-  .copy:hover, .dl:hover { background:#2d3850; }
-  footer { padding:16px 24px; background:var(--panel); border-top:1px solid var(--border); }
-  .composer { max-width:820px; margin:0 auto; display:flex; gap:10px; }
-  textarea { flex:1; resize:none; background:var(--panel2); color:var(--text);
-             border:1px solid var(--border); border-radius:10px; padding:12px 14px;
-             font-size:14px; font-family:inherit; min-height:48px; max-height:160px; }
-  button.send { background:var(--accent); border:none; color:#fff; border-radius:10px;
-                padding:0 22px; font-size:14px; font-weight:600; cursor:pointer; }
-  button.send:disabled { opacity:.5; cursor:not-allowed; }
-  button.scaffold { background:#23304a; border:1px solid var(--border); color:var(--text);
-                    border-radius:8px; padding:8px 12px; font-size:13px; cursor:pointer; }
-  button.scaffold:hover { border-color:var(--accent); }
-  .chips { max-width:820px; margin:10px auto 0; display:flex; gap:8px; flex-wrap:wrap; }
-  .chip { font-size:12px; background:var(--panel2); border:1px solid var(--border);
-          border-radius:20px; padding:6px 12px; color:var(--muted); cursor:pointer; }
-  .chip:hover { color:var(--text); border-color:var(--accent); }
-  .err { color:#ff8a8a; }
-  a { color:var(--accent); }
+  :root{
+    --bg:#0b0e17; --bg2:#0f1320; --panel:#161b2b; --panel2:#1b2235; --line:#26304a;
+    --text:#e8ecf6; --muted:#8b95b0; --brand:#6d8bff; --brand2:#9b6dff;
+    --good:#37d39b; --warn:#ffb454; --bad:#ff6b6b; --chip:#222b44;
+    --grad:linear-gradient(120deg,#6d8bff,#9b6dff 60%,#ff7ec7);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+       background:radial-gradient(1200px 600px at 85% -10%,rgba(109,139,255,.12),transparent),var(--bg);
+       background-color:var(--bg);color:var(--text);display:flex;flex-direction:column}
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* Sidebar */
+  .side{width:230px;flex-shrink:0;background:linear-gradient(180deg,var(--bg2),var(--bg));
+        border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px;gap:6px}
+  .brand{display:flex;align-items:center;gap:10px;margin:4px 6px 14px}
+  .logo{width:34px;height:34px;border-radius:10px;background:var(--grad);display:flex;
+        align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 18px rgba(109,139,255,.4)}
+  .brand b{font-size:15px;letter-spacing:.2px}
+  .brand small{display:block;color:var(--muted);font-size:10.5px;font-weight:500}
+  .navbtn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
+          color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;border:1px solid transparent}
+  .navbtn:hover{background:var(--panel);color:var(--text)}
+  .navbtn.active{background:var(--panel2);color:var(--text);border-color:var(--line)}
+  .navbtn .i{width:20px;text-align:center}
+  .side .who{margin-top:auto;border-top:1px solid var(--line);padding-top:12px}
+  .side label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  select,input,textarea{background:var(--panel);color:var(--text);border:1px solid var(--line);
+        border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit;width:100%}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--brand)}
+
+  /* Main */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .top{height:58px;flex-shrink:0;border-bottom:1px solid var(--line);display:flex;align-items:center;
+       gap:12px;padding:0 22px;background:rgba(15,19,32,.6);backdrop-filter:blur(8px)}
+  .top h1{font-size:15px;margin:0;font-weight:600}
+  .pill{font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(55,211,155,.12);
+        color:var(--good);border:1px solid rgba(55,211,155,.3)}
+  .spacer{flex:1}
+  .keywrap{display:flex;align-items:center;gap:8px}
+  .keywrap input{width:230px}
+  .badge{font-size:11px;color:var(--muted);white-space:nowrap}
+  .view{flex:1;overflow-y:auto;padding:24px;display:none}
+  .view.active{display:block}
+  .wrap{max-width:1000px;margin:0 auto}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;
+               text-transform:uppercase;letter-spacing:.5px}
+
+  .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:4px;gap:4px}
+  .seg button{flex:1;border:none;background:transparent;color:var(--muted);padding:9px;border-radius:8px;
+              cursor:pointer;font-size:13px;font-weight:600}
+  .seg button.on{background:var(--grad);color:#fff;box-shadow:0 4px 12px rgba(109,139,255,.35)}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:12px;background:var(--chip);border:1px solid var(--line);border-radius:8px;
+        padding:7px 11px;color:var(--text)}
+  .chip b{color:var(--brand)}
+  .ck{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text)}
+  .ck input{width:auto}
+
+  .btnrow{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .btn{border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn.primary{background:var(--grad);color:#fff;box-shadow:0 6px 16px rgba(109,139,255,.35)}
+  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  pre{background:#0a0d16;border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;
+      position:relative;margin:0}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;line-height:1.5}
+  .codebtns{position:absolute;top:9px;right:9px;display:flex;gap:6px}
+  .mini{font-size:11px;background:#1c2540;border:1px solid var(--line);color:var(--text);
+        border-radius:7px;padding:4px 9px;cursor:pointer}
+  .mini:hover{background:#26335a}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
+        border-radius:14px;padding:16px}
+  .stat .n{font-size:26px;font-weight:700;background:var(--grad);-webkit-background-clip:text;
+           background-clip:text;color:transparent}
+  .stat .l{font-size:11.5px;color:var(--muted);margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  td .tag{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--chip);border:1px solid var(--line)}
+  .empty{color:var(--muted);text-align:center;padding:30px;font-size:13px}
+
+  /* chat */
+  #chat{display:flex;flex-direction:column;gap:16px;margin-bottom:16px}
+  .msg{display:flex;gap:11px}
+  .msg .who{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;
+            justify-content:center;font-size:11px;font-weight:700}
+  .user .who{background:#243a2e;color:#9f9} .bot .who{background:#222b44;color:#9cf}
+  .bubble{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 15px;
+          line-height:1.55;font-size:14px;overflow-x:auto;max-width:100%}
+  .composer{display:flex;gap:10px}
+  .err{color:var(--bad)} a{color:var(--brand)}
+  .note{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);
+        border-radius:10px;padding:10px 13px;margin-top:6px}
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>🖥️ rwth2125 HPC Assistant</h1>
-    <div class="sub">CLAIX-2023 · H100 · ask for salloc/sbatch scripts, storage & data-transfer help</div>
-  </div>
-  <div class="spacer"></div>
-  <select id="user" title="Team member">
-    <option value="mayur">👤 Mayur</option>
-    <option value="madhava">👤 Madhava</option>
-  </select>
-  <select id="feature" title="Feature you're working on"></select>
-  <button class="scaffold" id="scaffoldBtn" title="Show repo skeleton + tuned Slurm script">🛠 Scaffold</button>
-  <button class="scaffold" id="bundleBtn" title="Download a ready project folder (.zip): job + git push + HPC pull-run">📦 Bundle</button>
-  <select id="model" title="Groq model">
-    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-    <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
-  </select>
-  <input id="apikey" type="password" placeholder="Paste Groq API key (gsk_…)" />
-  <span class="badge" id="keystate">🔒 locked</span>
-</header>
+<div class="app">
+  <!-- Sidebar -->
+  <nav class="side">
+    <div class="brand">
+      <div class="logo">⚡</div>
+      <div><b>WestAI</b><small>HPC Assistant</small></div>
+    </div>
+    <div class="navbtn active" data-tab="generate"><span class="i">⚙️</span> Generate</div>
+    <div class="navbtn" data-tab="assistant"><span class="i">💬</span> Assistant</div>
+    <div class="navbtn" data-tab="history"><span class="i">📜</span> History</div>
+    <div class="navbtn" data-tab="admin"><span class="i">🛡️</span> Admin</div>
+    <div class="who">
+      <label>Signed in as</label>
+      <select id="user">
+        <option value="mayur">👤 Mayur</option>
+        <option value="madhava">👤 Madhava</option>
+      </select>
+    </div>
+  </nav>
 
-<div id="chat"></div>
+  <!-- Main -->
+  <div class="main">
+    <div class="top">
+      <h1 id="tabTitle">Generate a job</h1>
+      <span class="pill">✓ 100% accurate · commands are generated, not guessed</span>
+      <div class="spacer"></div>
+      <div class="keywrap">
+        <input id="apikey" type="password" placeholder="Groq API key (gsk_…) — for Assistant" />
+        <span class="badge" id="keystate">🔒</span>
+      </div>
+    </div>
 
-<footer>
-  <div class="composer">
-    <textarea id="input" placeholder="e.g. Give Madhava an sbatch script for data generation: 2 H100, 8 hours, runs python dataforge/run.py"></textarea>
-    <button class="send" id="send">Send</button>
+    <!-- GENERATE -->
+    <section class="view active" id="view-generate">
+      <div class="wrap">
+        <div class="card">
+          <h2>Configure your job</h2>
+          <div class="sub">Development uses <b>salloc</b> (interactive). Production uses <b>sbatch</b> (queued). Pick the machine, VRAM and time — we keep it within the safe caps (max 4 GPUs, 24 h).</div>
+
+          <div class="field" style="margin-bottom:14px">
+            <label>Mode</label>
+            <div class="seg" id="modeSeg">
+              <button data-mode="development" class="on">🧪 Development · salloc</button>
+              <button data-mode="production">🚀 Production · sbatch</button>
+            </div>
+          </div>
+
+          <div class="ck" id="develWrap" style="margin-bottom:14px">
+            <input type="checkbox" id="develTest" />
+            <label for="develTest" style="margin:0;text-transform:none;letter-spacing:0;color:var(--text);font-size:13px">
+              Quick devel test (CPU only, no GPU, short queue) — uses the <b>devel</b> partition
+            </label>
+          </div>
+
+          <div class="grid">
+            <div class="field">
+              <label>Feature</label>
+              <select id="feature"></select>
+            </div>
+            <div class="field">
+              <label>GPUs (H100, 80&nbsp;GB VRAM each)</label>
+              <select id="gpus">
+                <option>1</option><option>2</option><option>3</option><option>4</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Wall time (HH:MM:SS, max 24h)</label>
+              <input id="time" value="04:00:00" />
+            </div>
+            <div class="field">
+              <label>Job label (optional, for tracking)</label>
+              <input id="label" placeholder="e.g. exp1" />
+            </div>
+          </div>
+
+          <div class="chips" id="readout"></div>
+
+          <div class="btnrow">
+            <button class="btn primary" id="genBtn">⚡ Generate command</button>
+            <button class="btn ghost" id="bundleBtn">📦 Download bundle (.zip)</button>
+          </div>
+        </div>
+
+        <div class="card" id="resultCard" style="display:none">
+          <h2 id="resultTitle">Result</h2>
+          <div class="chips" id="resultChips" style="margin-bottom:12px"></div>
+          <pre><div class="codebtns"><button class="mini" id="copyBtn">copy</button><button class="mini" id="dlBtn">⬇ .sh</button></div><code id="resultCode"></code></pre>
+          <div class="note" id="runNote"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ASSISTANT -->
+    <section class="view" id="view-assistant">
+      <div class="wrap">
+        <div id="chat"></div>
+        <div class="composer">
+          <textarea id="chatInput" rows="1" placeholder="Ask anything about CLAIX, storage, data transfer, modules… (needs Groq key)"></textarea>
+          <button class="btn primary" id="sendBtn">Send</button>
+        </div>
+        <div class="chips" style="margin-top:10px">
+          <span class="chip ex">How do I copy a dataset from my laptop to hpcwork?</span>
+          <span class="chip ex">Check GPU usage and CUDA version on a node</span>
+          <span class="chip ex">How do I get a script onto the cluster and run it?</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history">
+      <div class="wrap">
+        <div class="card">
+          <h2>Your run history</h2>
+          <div class="sub">Everything you generated through the app — machine, VRAM, RAM and duration you requested. Stored in this browser.</div>
+          <div id="historyTable"></div>
+          <div class="btnrow"><button class="btn ghost" id="clearHist">Clear history</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section class="view" id="view-admin">
+      <div class="wrap">
+        <div class="card">
+          <h2>Overview</h2>
+          <div class="sub">Aggregated from runs generated in this browser. For live cluster quota, run <code>r_quota -u rwth2125</code> on a login node.</div>
+          <div class="stats" id="adminStats"></div>
+        </div>
+        <div class="card">
+          <h2>By user</h2>
+          <div id="adminByUser"></div>
+        </div>
+        <div class="card">
+          <h2>Team & limits</h2>
+          <table>
+            <tr><th>Name</th><th>HPC user</th><th>Git branch</th></tr>
+            <tr><td>Mayur</td><td>kbp11750</td><td><span class="tag">mayur</span></td></tr>
+            <tr><td>Madhava</td><td>xco30720</td><td><span class="tag">madhava</span></td></tr>
+          </table>
+          <div class="note" style="margin-top:14px">Safety caps enforced server-side: <b>max 4 GPUs</b> · <b>max 24 h</b> (devel 1 h). Machine: <b>c23g · H100 (80 GB)</b>, project <b>rwth2125</b>.</div>
+        </div>
+      </div>
+    </section>
   </div>
-  <div class="chips">
-    <span class="chip">I want an interactive devel session to debug</span>
-    <span class="chip">sbatch for data generation: Madhava, 4 H100, 12h, python run.py</span>
-    <span class="chip">How do I get this script onto the cluster and run it?</span>
-    <span class="chip">How do I copy a dataset from my laptop to hpcwork?</span>
-    <span class="chip">Check GPU usage / CUDA version on a node</span>
-    <span class="chip">Explain the shared project folders and quotas</span>
-  </div>
-</footer>
+</div>
 
 <script>
-const chat   = document.getElementById('chat');
-const input  = document.getElementById('input');
-const sendBtn= document.getElementById('send');
-const apikey = document.getElementById('apikey');
-const modelSel = document.getElementById('model');
-const userSel = document.getElementById('user');
-const featureSel = document.getElementById('feature');
-const scaffoldBtn = document.getElementById('scaffoldBtn');
-const bundleBtn = document.getElementById('bundleBtn');
-const keystate = document.getElementById('keystate');
-const GIT_REMOTE = 'git@github.com:CloudBeeRobotics/west_ai_hpc_commands.git';
-let history = [];
+const $ = s => document.querySelector(s);
+const userSel=$('#user'), apikey=$('#apikey'), keystate=$('#keystate');
+const featureSel=$('#feature'), gpusSel=$('#gpus'), timeIn=$('#time'), labelIn=$('#label');
+const develTest=$('#develTest'), develWrap=$('#develWrap');
+const VRAM=80, RAM=122, CPU=24;
+let mode='development';
+const TITLES={generate:'Generate a job',assistant:'Assistant',history:'History',admin:'Admin overview'};
 
-// Populate the feature dropdown from the backend catalog.
-fetch('/api/features').then(r => r.json()).then(data => {
-  data.features.forEach(f => {
-    const o = document.createElement('option');
-    o.value = f.key; o.textContent = f.label;
-    o.title = `${f.blurb}  (default: ${f.gpus} GPU, ${f.time})`;
-    featureSel.appendChild(o);
-  });
-  featureSel.value = localStorage.getItem('feature') || 'dataforge';
-}).catch(() => {});
-userSel.value = localStorage.getItem('user') || 'mayur';
-userSel.addEventListener('change', () => localStorage.setItem('user', userSel.value));
-featureSel.addEventListener('change', () => localStorage.setItem('feature', featureSel.value));
+/* persistence */
+userSel.value=localStorage.getItem('user')||'mayur';
+apikey.value=localStorage.getItem('groq_key')||'';
+userSel.onchange=()=>{localStorage.setItem('user',userSel.value);renderHistory();renderAdmin();};
+apikey.oninput=()=>{keystate.textContent=apikey.value.trim().startsWith('gsk_')?'🔓':'🔒';localStorage.setItem('groq_key',apikey.value.trim());};
+keystate.textContent=apikey.value.trim().startsWith('gsk_')?'🔓':'🔒';
 
-// Persist the key locally (browser only — never sent anywhere but the backend->Groq).
-apikey.value = localStorage.getItem('groq_key') || '';
-modelSel.value = localStorage.getItem('groq_model') || modelSel.value;
-function refreshKeyState(){
-  const ok = apikey.value.trim().startsWith('gsk_');
-  keystate.textContent = ok ? '🔓 unlocked' : '🔒 locked';
-  localStorage.setItem('groq_key', apikey.value.trim());
-}
-apikey.addEventListener('input', refreshKeyState);
-modelSel.addEventListener('change', () => localStorage.setItem('groq_model', modelSel.value));
-refreshKeyState();
-
-document.querySelectorAll('.chip').forEach(c =>
-  c.addEventListener('click', () => { input.value = c.textContent; input.focus(); }));
-
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+/* tabs */
+document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const t=b.dataset.tab;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  $('#view-'+t).classList.add('active');
+  $('#tabTitle').textContent=TITLES[t];
+  if(t==='history')renderHistory(); if(t==='admin')renderAdmin();
 });
-sendBtn.addEventListener('click', send);
 
-// --- Minimal, safe markdown: escape, then render ```code``` and `inline` ---
-function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function renderMarkdown(text){
-  const parts = text.split(/```/);
-  let html = '';
-  parts.forEach((part, i) => {
-    if (i % 2 === 1) {                       // code block
-      const body = part.replace(/^[a-zA-Z]+\n/, '');  // strip a language hint
-      const isScript = /#!|#SBATCH|salloc|sbatch|mkdir/.test(body);
-      const dl = isScript ? `<button class="dl">⬇ .sh</button>` : '';
-      html += `<pre>${dl}<button class="copy">copy</button><code>${escapeHtml(body)}</code></pre>`;
-    } else {
-      let p = escapeHtml(part)
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      html += p;
-    }
-  });
-  return html;
+/* features */
+fetch('/api/features').then(r=>r.json()).then(d=>{
+  d.features.forEach(f=>{const o=document.createElement('option');o.value=f.key;o.textContent=f.label;featureSel.appendChild(o);});
+  featureSel.value=localStorage.getItem('feature')||'dataforge'; updateReadout();
+});
+featureSel.onchange=()=>{localStorage.setItem('feature',featureSel.value);};
+
+/* mode segmented */
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); mode=b.dataset.mode;
+  develWrap.style.display = mode==='development' ? 'flex':'none';
+  if(mode==='production'){develTest.checked=false;}
+  updateReadout();
+});
+develTest.onchange=updateReadout;
+gpusSel.onchange=updateReadout; timeIn.oninput=updateReadout;
+
+function hours(t){let d=0;t=(t||'').trim();if(t.includes('-')){const p=t.split('-');d=+p[0];t=p[1];}
+  const a=t.split(':').map(Number);while(a.length<3)a.unshift(0);return d*24+a[0]+a[1]/60+a[2]/3600;}
+
+function currentRes(){
+  if(mode==='development'&&develTest.checked)
+    return {machine:'devel (CPU test)',gpus:0,vram_gb:0,ram_gb:8,cpus:2,time:timeIn.value,hours:hours(timeIn.value)};
+  const g=+gpusSel.value;
+  return {machine:'c23g · H100',gpus:g,vram_gb:g*VRAM,ram_gb:g*RAM,cpus:g*CPU,time:timeIn.value,hours:hours(timeIn.value)};
+}
+function updateReadout(){
+  const r=currentRes(); const tool=mode==='production'?'sbatch':'salloc';
+  const warn = r.hours>(mode==='development'&&develTest.checked?1:24) ? ' style="border-color:var(--bad)"':'';
+  $('#readout').innerHTML=
+    `<div class="chip">Tool <b>${tool}</b></div>`+
+    `<div class="chip">Machine <b>${r.machine}</b></div>`+
+    `<div class="chip">VRAM <b>${r.vram_gb} GB</b></div>`+
+    `<div class="chip">RAM <b>${r.ram_gb} GB</b></div>`+
+    `<div class="chip">CPUs <b>${r.cpus}</b></div>`+
+    `<div class="chip"${warn}>Duration <b>${r.time}</b></div>`;
+  gpusSel.disabled = (mode==='development'&&develTest.checked);
 }
 
-// Save a script block to a .sh file. Filename is derived from the content.
-function downloadSh(code){
-  let name = 'westai_job.sh';
-  const jn = code.match(/--job-name=([A-Za-z0-9_\-]+)/);
-  if (jn) name = jn[1] + '.sh';
-  else if (/mkdir -p/.test(code)) name = 'scaffold_' + (featureSel.value || 'feature') + '.sh';
-  else if (/salloc/.test(code)) name = 'salloc_session.sh';
-  const blob = new Blob([code.endsWith('\n') ? code : code + '\n'],
-                        {type:'application/x-sh'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(a.href);
+/* history storage */
+const HKEY='westai_runs';
+const getRuns=()=>JSON.parse(localStorage.getItem(HKEY)||'[]');
+function logRun(e){const a=getRuns();a.unshift(e);localStorage.setItem(HKEY,JSON.stringify(a.slice(0,500)));}
+
+/* generate */
+$('#genBtn').onclick=async()=>{
+  const r=currentRes();
+  const body={user:userSel.value,feature:featureSel.value,mode,devel:develTest.checked,
+              gpus:r.gpus||1,time:timeIn.value};
+  try{
+    const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await res.json();
+    if(d.error){showResult('Error',`<span class="err">${esc(d.error)}</span>`,null,d.script||'');return;}
+    showResult(d.kind==='sbatch'?'sbatch script':'salloc command', '', d.resources, d.script);
+    logRun({ts:Date.now(),user:userSel.value,mode,kind:d.kind,feature:featureSel.value,
+             label:labelIn.value||featureSel.value,run_id:'-',...d.resources});
+  }catch(e){showResult('Error',`<span class="err">${esc(e.message)}</span>`,null,'');}
+};
+
+function showResult(title,html,res,code){
+  $('#resultCard').style.display='block';
+  $('#resultTitle').textContent=title;
+  $('#resultChips').innerHTML = res ?
+    `<div class="chip">Machine <b>${res.machine}</b></div>`+
+    `<div class="chip">VRAM <b>${res.vram_gb} GB</b></div>`+
+    `<div class="chip">RAM <b>${res.ram_gb} GB</b></div>`+
+    `<div class="chip">CPUs <b>${res.cpus}</b></div>`+
+    `<div class="chip">Duration <b>${res.time}</b></div>` : '';
+  $('#resultCode').textContent=code||'';
+  const isSbatch=title.includes('sbatch');
+  $('#runNote').innerHTML = html || (isSbatch
+    ? 'Download it, then on a login node: <code>sbatch run.sh</code> · monitor <code>squeue --me</code>. Or use <b>Download bundle</b> for the git push → HPC pull → run flow.'
+    : 'Download it, then run it <b>directly</b> on a login node (in a fresh shell): <code>chmod +x dev_session.sh && ./dev_session.sh</code> — <b>not</b> sbatch. It drops you on the compute node; type <code>exit</code> to release it.');
+  $('#dlBtn').style.display = code ? 'inline-block':'none';
+  $('#dlBtn').textContent = isSbatch ? '⬇ run.sh' : '⬇ dev_session.sh';
+  $('#dlBtn').dataset.name = isSbatch ? 'run.sh' : 'dev_session.sh';
+  $('#resultCode').parentElement.style.display = code ? 'block':'none';
+  $('#resultCard').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
+$('#copyBtn').onclick=()=>{navigator.clipboard.writeText($('#resultCode').textContent);$('#copyBtn').textContent='copied!';setTimeout(()=>$('#copyBtn').textContent='copy',1200);};
+$('#dlBtn').onclick=()=>{const c=$('#resultCode').textContent;
+  let name=$('#dlBtn').dataset.name||'job.sh';
+  const m=c.match(/--job-name=([\w-]+)/); if(m&&name==='run.sh')name=m[1]+'.sh';
+  saveBlob(c+'\n',name,'application/x-sh');};
 
-function addMsg(role, text){
-  const wrap = document.createElement('div');
-  wrap.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
-  wrap.innerHTML = `<div class="who">${role === 'user' ? 'You' : 'AI'}</div>`
-                 + `<div class="bubble">${renderMarkdown(text)}</div>`;
-  chat.appendChild(wrap);
-  wrap.querySelectorAll('.copy').forEach(b => b.addEventListener('click', () => {
-    navigator.clipboard.writeText(b.parentElement.querySelector('code').textContent);
-    b.textContent = 'copied!'; setTimeout(()=>b.textContent='copy', 1200);
-  }));
-  wrap.querySelectorAll('.dl').forEach(b => b.addEventListener('click', () => {
-    const code = b.parentElement.querySelector('code').textContent;
-    downloadSh(code);
-  }));
-  chat.scrollTop = chat.scrollHeight;
-  return wrap;
+/* bundle */
+$('#bundleBtn').onclick=async()=>{
+  const r=currentRes();
+  try{
+    const res=await fetch('/api/bundle',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({feature:featureSel.value,user:userSel.value,gpus:(+gpusSel.value),
+        time:timeIn.value,label:labelIn.value||featureSel.value})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error||res.statusText);}
+    const runId=res.headers.get('X-Run-Id')||'-';
+    const blob=await res.blob();
+    saveBlob(blob,(labelIn.value||featureSel.value)+'_'+runId+'.zip');
+    logRun({ts:Date.now(),user:userSel.value,mode:'production',kind:'bundle',feature:featureSel.value,
+            label:labelIn.value||featureSel.value,run_id:runId,
+            machine:'c23g · H100',gpus:+gpusSel.value,vram_gb:(+gpusSel.value)*VRAM,
+            ram_gb:(+gpusSel.value)*RAM,cpus:(+gpusSel.value)*CPU,time:timeIn.value,hours:hours(timeIn.value)});
+    showResult('Bundle downloaded','📦 <b>'+(labelIn.value||featureSel.value)+'_'+runId+'.zip</b> → unzip, then on laptop <code>./scripts/local_setup.sh</code> (pushes to your <b>'+userSel.value+'</b> branch), on HPC <code>./scripts/hpc_pull_run.sh</code>.',
+      {machine:'c23g · H100',vram_gb:(+gpusSel.value)*VRAM,ram_gb:(+gpusSel.value)*RAM,cpus:(+gpusSel.value)*CPU,time:timeIn.value},'');
+    $('#resultCode').parentElement.style.display='none';
+  }catch(e){showResult('Error',`<span class="err">${esc(e.message)}</span>`,null,'');}
+};
+
+function saveBlob(data,name,type){const b=(data instanceof Blob)?data:new Blob([data],{type:type||'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);}
+
+/* history view */
+function renderHistory(){
+  const runs=getRuns().filter(r=>r.user===userSel.value);
+  if(!runs.length){$('#historyTable').innerHTML='<div class="empty">No runs yet — generate a command or bundle.</div>';return;}
+  let h='<table><tr><th>When</th><th>Mode</th><th>Tool</th><th>Feature / label</th><th>Machine</th><th>GPU</th><th>VRAM</th><th>RAM</th><th>Time</th><th>Run id</th></tr>';
+  runs.forEach(r=>{h+=`<tr><td>${new Date(r.ts).toLocaleString()}</td><td><span class="tag">${r.mode}</span></td>
+    <td>${r.kind}</td><td>${esc(r.label||r.feature)}</td><td>${esc(r.machine||'-')}</td>
+    <td>${r.gpus??'-'}</td><td>${r.vram_gb??0} GB</td><td>${r.ram_gb??0} GB</td><td>${r.time||'-'}</td>
+    <td>${esc(r.run_id||'-')}</td></tr>`;});
+  $('#historyTable').innerHTML=h+'</table>';
 }
+$('#clearHist').onclick=()=>{if(confirm('Clear all run history in this browser?')){localStorage.removeItem(HKEY);renderHistory();renderAdmin();}};
 
-async function send(){
-  const text = input.value.trim();
-  const key = apikey.value.trim();
-  if (!text) return;
-  if (!key.startsWith('gsk_')) {
-    addMsg('bot', '<span class="err">Please paste a valid Groq API key (starts with <code>gsk_</code>) in the top-right field to unlock the assistant.</span>');
-    return;
-  }
-  input.value = '';
-  addMsg('user', text);
-  sendBtn.disabled = true;
-  const thinking = addMsg('bot', '…thinking');
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: key, message: text, history,
-                             model: modelSel.value,
-                             user: userSel.value, feature: featureSel.value })
-    });
-    const data = await res.json();
-    thinking.remove();
-    if (data.error) { addMsg('bot', `<span class="err">${escapeHtml(data.error)}</span>`); }
-    else {
-      addMsg('bot', data.reply || '(empty response)');
-      history.push({ role:'user', content:text });
-      history.push({ role:'assistant', content:data.reply || '' });
-      if (history.length > 12) history = history.slice(-12);  // keep context small
-    }
-  } catch (e) {
-    thinking.remove();
-    addMsg('bot', `<span class="err">Network error: ${escapeHtml(e.message)}</span>`);
-  } finally {
-    sendBtn.disabled = false;
-    input.focus();
-  }
+/* admin view */
+function renderAdmin(){
+  const runs=getRuns();
+  const gpuh=runs.reduce((s,r)=>s+((r.gpus||0)*(r.hours||0)),0);
+  const users=new Set(runs.map(r=>r.user));
+  $('#adminStats').innerHTML=
+    stat(runs.length,'Total runs')+stat(gpuh.toFixed(1),'GPU-hours requested')+
+    stat(users.size,'Active users')+stat(runs.filter(r=>r.kind==='bundle').length,'Bundles');
+  const by={};
+  runs.forEach(r=>{(by[r.user]=by[r.user]||{n:0,g:0,v:0}); by[r.user].n++; by[r.user].g+=(r.gpus||0)*(r.hours||0); by[r.user].v=Math.max(by[r.user].v,r.vram_gb||0);});
+  let h='<table><tr><th>User</th><th>Runs</th><th>GPU-hours</th><th>Peak VRAM</th></tr>';
+  Object.keys(by).forEach(u=>h+=`<tr><td>${esc(u)}</td><td>${by[u].n}</td><td>${by[u].g.toFixed(1)}</td><td>${by[u].v} GB</td></tr>`);
+  if(!Object.keys(by).length)h+='<tr><td colspan="4" class="empty">No data yet.</td></tr>';
+  $('#adminByUser').innerHTML=h+'</table>';
 }
+const stat=(n,l)=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
 
-// --- Scaffold button: deterministic form path (no API key needed) ----------
-async function scaffold(){
-  scaffoldBtn.disabled = true;
-  addMsg('user', `🛠 Scaffold feature: <strong>${featureSel.value}</strong> for ${userSel.value}`);
-  const pending = addMsg('bot', '…building scaffold');
-  try {
-    const res = await fetch('/api/scaffold', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ feature: featureSel.value, user: userSel.value })
-    });
-    const data = await res.json();
-    pending.remove();
-    if (data.error) addMsg('bot', `<span class="err">${escapeHtml(data.error)}</span>`);
-    else addMsg('bot', "Here's your scaffold — run it on a login node:\n\n```bash\n" + data.script + "\n```");
-  } catch(e){ pending.remove(); addMsg('bot', `<span class="err">${escapeHtml(e.message)}</span>`); }
-  finally { scaffoldBtn.disabled = false; }
-}
-scaffoldBtn.addEventListener('click', scaffold);
-
-// --- Bundle button: download a ready project .zip (no API key needed) -------
-async function downloadBundle(){
-  bundleBtn.disabled = true;
-  addMsg('user', `📦 Bundle: <strong>${featureSel.value}</strong> for ${userSel.value}`);
-  try {
-    const res = await fetch('/api/bundle', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ feature: featureSel.value, user: userSel.value, remote: GIT_REMOTE })
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.statusText); }
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `${featureSel.value}_bundle.zip`;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
-    addMsg('bot', "📦 Downloaded **" + featureSel.value + "_bundle.zip** (pushes to the **" + userSel.value + "** branch of the commands repo). Unzip it, then:\n\n```bash\n# on your laptop:\n./scripts/local_setup.sh\n# on an HPC login node:\n./scripts/hpc_pull_run.sh\n```");
-  } catch(e){ addMsg('bot', `<span class="err">${escapeHtml(e.message)}</span>`); }
-  finally { bundleBtn.disabled = false; }
-}
-bundleBtn.addEventListener('click', downloadBundle);
-
-addMsg('bot', "Hi! I'm the **WestAI HPC Assistant** for project rwth2125. Pick who you are and the **feature** you're working on (top bar), then hit **🛠 Scaffold** to generate its repo + Slurm script — or paste your Groq key and just ask. I create **salloc** sessions (dev) and **sbatch** scripts (serious jobs), explain **shared storage**, **data transfer**, and **GPU/CUDA/module** commands. Resource requests are capped for safety.");
+/* assistant chat */
+const chat=$('#chat'),chatInput=$('#chatInput');let chatHist=[];
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function md(t){const p=t.split(/```/);let h='';p.forEach((x,i)=>{if(i%2){const b=x.replace(/^[a-z]+\n/,'');
+  h+=`<pre><div class="codebtns"><button class="mini cp">copy</button></div><code>${esc(b)}</code></pre>`;}
+  else h+=esc(x).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');});return h;}
+function addMsg(role,text){const w=document.createElement('div');w.className='msg '+(role==='user'?'user':'bot');
+  w.innerHTML=`<div class="who">${role==='user'?'You':'AI'}</div><div class="bubble">${md(text)}</div>`;
+  chat.appendChild(w);w.querySelectorAll('.cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.parentElement.parentElement.querySelector('code').textContent);b.textContent='copied!';});
+  chat.scrollTop=chat.scrollHeight;return w;}
+async function send(){const t=chatInput.value.trim();const k=apikey.value.trim();if(!t)return;
+  if(!k.startsWith('gsk_')){addMsg('bot','<span class="err">Paste your Groq API key (top-right) to use the Assistant.</span>');return;}
+  chatInput.value='';addMsg('user',t);const th=addMsg('bot','…thinking');
+  try{const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({api_key:k,message:t,history:chatHist,user:userSel.value,feature:featureSel.value})});
+    const d=await res.json();th.remove();
+    if(d.error)addMsg('bot',`<span class="err">${esc(d.error)}</span>`);
+    else{addMsg('bot',d.reply||'(empty)');chatHist.push({role:'user',content:t});chatHist.push({role:'assistant',content:d.reply||''});if(chatHist.length>12)chatHist=chatHist.slice(-12);}
+  }catch(e){th.remove();addMsg('bot',`<span class="err">${esc(e.message)}</span>`);}}
+$('#sendBtn').onclick=send;
+chatInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+document.querySelectorAll('.chip.ex').forEach(c=>c.onclick=()=>{chatInput.value=c.textContent;chatInput.focus();});
+addMsg('bot',"Hi! I'm the **WestAI** assistant. Use the **Generate** tab for guaranteed-correct commands; ask me here about CLAIX storage, data transfer, modules, GPU/CUDA — grounded on the official RWTH docs.");
 </script>
 </body>
 </html>
