@@ -176,3 +176,8 @@ def set_status(uid, status):
         raise ValueError("bad status")
     _exec("UPDATE users SET status=? WHERE id=?", (status, uid))
     return get_user(uid)
+
+
+def delete_user(uid):
+    _exec("DELETE FROM users WHERE id=?", (uid,))
+    return True

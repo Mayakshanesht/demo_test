@@ -108,6 +108,18 @@ def admin_set_status(req: StatusRequest, _=Depends(require_admin)):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+class IdRequest(BaseModel):
+    id: str
+
+
+@app.post("/api/admin/delete_user")
+def admin_delete_user(req: IdRequest, admin=Depends(require_admin)):
+    if req.id == admin["uid"]:
+        return JSONResponse({"error": "You can't delete your own account."}, status_code=400)
+    auth.delete_user(req.id)
+    return {"ok": True}
+
+
 class ChatRequest(BaseModel):
     api_key: str
     message: str
@@ -253,7 +265,8 @@ def chat(req: ChatRequest, _=Depends(require_user)):
 @app.get("/api/health")
 def health():
     return {"status": "ok", "default_model": DEFAULT_MODEL,
-            "team": list(sg.TEAM.keys())}
+            "team": list(sg.TEAM.keys()),
+            "db": "postgres" if auth.USE_PG else "sqlite (ephemeral on Vercel!)"}
 
 
 @app.get("/api/features")

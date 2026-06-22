@@ -542,29 +542,42 @@ function renderAdmin(){
   Object.keys(by).forEach(u=>h+=`<tr><td>${esc(u)}</td><td>${by[u].n}</td><td>${by[u].g.toFixed(1)}</td><td>${by[u].v} GB</td></tr>`);
   if(!Object.keys(by).length)h+='<tr><td colspan="4" class="empty">No data yet.</td></tr>';
   $('#adminByUser').innerHTML=h+'</table>';
-  if(me&&me.role==='admin')loadAdminUsers();
+  if(me&&me.role==='admin'){loadAdminUsers();}
+  else{$('#adminUsersCard').style.display='block';
+    $('#adminUsers').innerHTML='<div class="empty">Only admins can approve or remove users. Ask an admin to grant you access.</div>';}
 }
 const stat=(n,l)=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
 
 /* admin: user access management */
 function loadAdminUsers(){
   $('#adminUsersCard').style.display='block';
+  $('#adminUsers').innerHTML='<div class="empty">Loading users…</div>';
   api('/api/admin/users').then(r=>r.json()).then(d=>{
-    if(!d.users)return;
-    let h='<table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr>';
-    d.users.forEach(u=>{
-      const act = u.role==='admin' ? '<span class="badge">—</span>' :
-        `<button class="approve" data-id="${u.id}" data-s="approved">Approve</button>`+
-        `<button class="reject" data-id="${u.id}" data-s="rejected">Decline</button>`;
+    if(d.error){$('#adminUsers').innerHTML=`<div class="empty err">${esc(d.error)}</div>`;return;}
+    const users=d.users||[];
+    if(!users.length){$('#adminUsers').innerHTML='<div class="empty">No users yet.</div>';return;}
+    let h='<table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
+    users.forEach(u=>{
+      const isMe = me && u.id===me.id;
+      let act='';
+      if(u.status!=='approved') act+=`<button class="approve" data-id="${u.id}" data-s="approved">Approve</button>`;
+      if(u.status==='approved'&&u.role!=='admin') act+=`<button class="reject" data-id="${u.id}" data-s="rejected">Suspend</button>`;
+      if(!isMe) act+=`<button class="reject del" data-id="${u.id}">Delete</button>`;
+      if(isMe) act+='<span class="badge">you</span>';
       h+=`<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role}</td>
-          <td><span class="st ${u.status}">${u.status}</span></td><td>${act}</td></tr>`;
+          <td><span class="st ${u.status}">${u.status}</span></td><td>${act||'—'}</td></tr>`;
     });
     $('#adminUsers').innerHTML=h+'</table>';
-    document.querySelectorAll('#adminUsers .approve,#adminUsers .reject').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#adminUsers .approve,#adminUsers .reject:not(.del)').forEach(b=>b.onclick=()=>{
       api('/api/admin/set_status',{method:'POST',body:JSON.stringify({id:b.dataset.id,status:b.dataset.s})})
-        .then(()=>loadAdminUsers());
+        .then(()=>loadAdminUsers()).catch(()=>{});
     });
-  }).catch(()=>{});
+    document.querySelectorAll('#adminUsers .del').forEach(b=>b.onclick=()=>{
+      if(!confirm('Permanently delete this user?'))return;
+      api('/api/admin/delete_user',{method:'POST',body:JSON.stringify({id:b.dataset.id})})
+        .then(()=>loadAdminUsers()).catch(()=>{});
+    });
+  }).catch(e=>{$('#adminUsers').innerHTML=`<div class="empty err">${esc(e.message)}</div>`;});
 }
 
 /* assistant chat */
