@@ -64,6 +64,7 @@ class BundleRequest(BaseModel):
     gpus: int | None = None
     time: str | None = None
     remote: str = bundle.DEFAULT_REMOTE
+    branch: str | None = None   # defaults to the user's name (per-user branch)
 
 
 def run_tool(name: str, args: dict) -> str:
@@ -199,7 +200,7 @@ def make_bundle(req: BundleRequest):
     """Return a downloadable .zip project folder (job + git-push + pull-run)."""
     try:
         name, data = bundle.build_bundle(req.feature, req.user, req.gpus,
-                                         req.time, req.remote)
+                                         req.time, req.remote, req.branch)
         return Response(content=data, media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
     except Exception as e:

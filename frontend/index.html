@@ -106,7 +106,7 @@ const featureSel = document.getElementById('feature');
 const scaffoldBtn = document.getElementById('scaffoldBtn');
 const bundleBtn = document.getElementById('bundleBtn');
 const keystate = document.getElementById('keystate');
-const GIT_REMOTE = 'git@github.com:CloudBeeRobotics/WestAI_hpc_assistant.git';
+const GIT_REMOTE = 'git@github.com:CloudBeeRobotics/west_ai_hpc_commands.git';
 let history = [];
 
 // Populate the feature dropdown from the backend catalog.
@@ -270,7 +270,7 @@ async function downloadBundle(){
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `${featureSel.value}_bundle.zip`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
-    addMsg('bot', "📦 Downloaded **" + featureSel.value + "_bundle.zip**. Unzip it, then:\n\n```bash\n# on your laptop:\n./scripts/local_setup.sh\n# on an HPC login node:\n./scripts/hpc_pull_run.sh\n```");
+    addMsg('bot', "📦 Downloaded **" + featureSel.value + "_bundle.zip** (pushes to the **" + userSel.value + "** branch of the commands repo). Unzip it, then:\n\n```bash\n# on your laptop:\n./scripts/local_setup.sh\n# on an HPC login node:\n./scripts/hpc_pull_run.sh\n```");
   } catch(e){ addMsg('bot', `<span class="err">${escapeHtml(e.message)}</span>`); }
   finally { bundleBtn.disabled = false; }
 }

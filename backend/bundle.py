@@ -15,46 +15,66 @@ import zipfile
 import features as ft
 import slurm_gen as sg
 
-DEFAULT_REMOTE = "git@github.com:CloudBeeRobotics/WestAI_hpc_assistant.git"
+# The COMMANDS repo: where Mayur & Madhava push/pull generated scripts, each on
+# their OWN branch. (The webapp lives in a separate repo, WestAI_hpc_assistant.)
+DEFAULT_REMOTE = "git@github.com:CloudBeeRobotics/west_ai_hpc_commands.git"
+COMMANDS_DIR = "west_ai_hpc_commands"
 REPOS_ROOT = "/work/rwth2125/repos"
 
 
-def _local_setup(feature, remote):
+def _local_setup(feature, remote, branch):
     return f"""#!/usr/bin/env bash
-# Run on your LAPTOP, from inside this folder. Creates the git repo and pushes it.
-# Usage: ./scripts/local_setup.sh [git-remote-url]
+# Run on your LAPTOP from inside this folder. Clones the shared COMMANDS repo,
+# drops this feature into it on YOUR branch ({branch}), commits and pushes.
+# Usage: ./scripts/local_setup.sh [git-remote-url] [branch]
 set -euo pipefail
 REMOTE="${{1:-{remote}}}"
+BRANCH="${{2:-{branch}}}"
+FEATURE="{feature}"
 
-cd "$(dirname "$0")/.."           # repo root (this folder)
-git init -q
-git add .
-git commit -q -m "Add {feature} feature scaffold (WestAI HPC Assistant)" || echo "nothing to commit"
-git branch -M main
-git remote add origin "$REMOTE" 2>/dev/null || git remote set-url origin "$REMOTE"
-git push -u origin main
-echo "Pushed to $REMOTE (branch main)."
+HERE="$(cd "$(dirname "$0")/.." && pwd)"        # this unzipped feature folder
+WORK="$HERE/../{COMMANDS_DIR}"
+
+if [ ! -d "$WORK/.git" ]; then
+  git clone "$REMOTE" "$WORK"
+fi
+cd "$WORK"
+git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH"
+git pull --ff-only origin "$BRANCH" 2>/dev/null || true
+
+# copy the feature into the repo (preserves repo history; no nested .git)
+rsync -a --exclude '.git' "$HERE/" "./$FEATURE/"
+git add "$FEATURE"
+git commit -m "Update $FEATURE ({branch})" || echo "nothing to commit"
+git push -u origin "$BRANCH"
+echo "Pushed $FEATURE to $REMOTE on branch $BRANCH."
 """
 
 
-def _hpc_pull_run(feature, remote):
+def _hpc_pull_run(feature, remote, branch):
     return f"""#!/usr/bin/zsh
-# Run on an HPC LOGIN node. Pulls the latest code and submits the job.
-# Usage: ./scripts/hpc_pull_run.sh [git-remote-url]
+# Run on an HPC LOGIN node. Pulls YOUR branch ({branch}) of the commands repo
+# and submits the job. Usage: ./scripts/hpc_pull_run.sh [git-remote-url] [branch]
 REMOTE="${{1:-{remote}}}"
+BRANCH="${{2:-{branch}}}"
+FEATURE="{feature}"
+
 mkdir -p {REPOS_ROOT}
 cd {REPOS_ROOT}
-
-if [ -d "{feature}/.git" ]; then
-  cd {feature} && git pull --ff-only
+if [ -d "{COMMANDS_DIR}/.git" ]; then
+  cd {COMMANDS_DIR}
+  git fetch origin "$BRANCH"
+  git checkout "$BRANCH"
+  git pull --ff-only origin "$BRANCH"
 else
-  git clone "$REMOTE" {feature} && cd {feature}
+  git clone "$REMOTE" {COMMANDS_DIR} && cd {COMMANDS_DIR} && git checkout "$BRANCH"
 fi
 
+cd "$FEATURE"
 mkdir -p logs
 sbatch slurm/run.sh
 squeue --me
-echo "Submitted. Watch with: squeue --me   |   logs in {REPOS_ROOT}/{feature}/logs/"
+echo "Submitted $FEATURE (branch $BRANCH). Logs: {REPOS_ROOT}/{COMMANDS_DIR}/$FEATURE/logs/"
 """
 
 
@@ -76,27 +96,29 @@ ls -ld /work/rwth2125/repos /hpcwork/rwth2125/datasets
 """
 
 
-def _readme(feature, user, remote, gpus, time):
+def _readme(feature, user, remote, branch, gpus, time):
     return f"""# {feature} — WestAI HPC Assistant bundle
 
-Owner: {user} · Project rwth2125 · CLAIX-2023 (c23g / H100)
+Owner: {user} (git branch: **{branch}**) · Project rwth2125 · CLAIX-2023 (c23g / H100)
 Resources: {gpus} GPU, {time}
+Commands repo: {remote}
 
 ## Workflow (no commands to memorise)
 
-1. **On your laptop** — create the repo and push:
+1. **On your laptop** — push this to your branch of the commands repo:
    ```bash
-   ./scripts/local_setup.sh {remote}
+   ./scripts/local_setup.sh           # uses remote {remote} on branch {branch}
    ```
-2. **On an HPC login node** — pull and run:
+2. **On an HPC login node** — pull your branch and run:
    ```bash
-   ./scripts/hpc_pull_run.sh {remote}
+   ./scripts/hpc_pull_run.sh
    ```
 3. (Once per project) build shared storage on HPC:
    ```bash
    ./scripts/hpc_filesystem_setup.sh
    ```
 
+Mayur and Madhava each work on their own branch, so pushes/pulls don't collide.
 Monitor: `squeue --me` · efficiency after finish: `seff <jobid>`
 
 ## Contents
@@ -107,7 +129,7 @@ Monitor: `squeue --me` · efficiency after finish: `seff <jobid>`
 
 
 def build_bundle(feature="custom", user="mayur", gpus=None, time=None,
-                 remote=DEFAULT_REMOTE):
+                 remote=DEFAULT_REMOTE, branch=None):
     """Return (filename, zip_bytes) for the feature project bundle."""
     feature = (feature or "custom").lower()
     if feature not in ft.FEATURES:
@@ -116,6 +138,7 @@ def build_bundle(feature="custom", user="mayur", gpus=None, time=None,
     gpus = int(gpus) if gpus else prof["gpus"]
     time = time or prof["time"]
     remote = remote or DEFAULT_REMOTE
+    branch = branch or (user or "mayur").lower()   # per-user branch
     pkg = feature.replace("-", "_")
 
     run_sh = sg.generate_script(user=user, mode="production", gpus=gpus,
@@ -123,10 +146,10 @@ def build_bundle(feature="custom", user="mayur", gpus=None, time=None,
 
     root = feature
     files = {
-        f"{root}/README.md": _readme(feature, user, remote, gpus, time),
+        f"{root}/README.md": _readme(feature, user, remote, branch, gpus, time),
         f"{root}/slurm/run.sh": run_sh,
-        f"{root}/scripts/local_setup.sh": _local_setup(feature, remote),
-        f"{root}/scripts/hpc_pull_run.sh": _hpc_pull_run(feature, remote),
+        f"{root}/scripts/local_setup.sh": _local_setup(feature, remote, branch),
+        f"{root}/scripts/hpc_pull_run.sh": _hpc_pull_run(feature, remote, branch),
         f"{root}/scripts/hpc_filesystem_setup.sh": _hpc_fs_setup(),
         f"{root}/{pkg}/__init__.py": "",
         f"{root}/{pkg}/run.py": (
