@@ -58,25 +58,48 @@ cd webapp
 ```
 Get a free Groq key: <https://console.groq.com/keys>
 
-## Deploy to Vercel (frontend **and** backend)
+## Accounts & access (sign up / sign in / approval)
 
-Vercel runs the backend as a **Python serverless function** — our backend is
-stateless and fast, so it fits serverless perfectly (no separate host needed).
+The app is gated behind login. Flow:
+- **Sign up** (name, email, password) → account is created **pending**.
+- An **admin approves** it (Admin tab → User access → Approve) → the person can sign in.
+- The **first account to sign up becomes the admin** automatically. You can also
+  pre-mark admins with the `ADMIN_EMAILS` env var (comma-separated).
 
-- `api/index.py` exposes the FastAPI app; `vercel.json` routes all requests to it
-  and bundles `backend/` + `frontend/`; root `requirements.txt` lists deps.
+Passwords are pbkdf2-hashed; sessions are HMAC-signed tokens (7-day expiry) kept
+in the browser. All work endpoints require a valid token; approvals require admin.
 
-```bash
-npm i -g vercel
-cd webapp
-vercel            # preview deploy
-vercel --prod     # production
-```
-Set the Vercel **Root Directory** to `webapp/`. Test locally with `vercel dev`.
+## Database
 
-If you ever split them (frontend on Vercel, backend elsewhere like Render/Railway/
-the HPC), CORS is already enabled — just point the frontend `fetch` calls at the
-backend URL.
+Storage is **dual-backend** (same code both ways):
+- **Local dev** → SQLite at `backend/data/users.db` automatically (no setup).
+- **Production / Vercel** → **PostgreSQL** via the `DATABASE_URL` env var
+  (Vercel's filesystem is ephemeral, so you must use a hosted DB there).
+
+## Deploy to Vercel (frontend **and** backend, with Postgres)
+
+Vercel runs the backend as a **Python serverless function**. `api/index.py`
+exposes the FastAPI app; `vercel.json` routes all requests to it and bundles
+`backend/` + `frontend/`; root `requirements.txt` lists deps (incl. `psycopg`).
+
+1. **Create a database** — in the Vercel dashboard: Storage → **Postgres** (Neon).
+   It sets `DATABASE_URL` / `POSTGRES_URL` for you. (Supabase/Neon also work.)
+2. **Set env vars** (Project → Settings → Environment Variables):
+   - `DATABASE_URL` — the Postgres connection string (auto if you used Vercel Postgres)
+   - `SESSION_SECRET` — a long random string (sign tokens)
+   - `ADMIN_EMAILS` — optional, e.g. `mayur@cloudbee.io`
+   - `VERCEL` — set to `1`
+3. **Deploy**:
+   ```bash
+   npm i -g vercel
+   cd webapp
+   vercel --prod     # set Root Directory to webapp/
+   ```
+The users table is created automatically on first request. Test locally first
+with `vercel dev` (it loads `.env`).
+
+If you ever split frontend/backend, CORS is already enabled — point the frontend
+`fetch` calls at the backend URL.
 
 ## Push to GitHub
 

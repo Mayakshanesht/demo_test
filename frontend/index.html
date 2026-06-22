@@ -121,6 +121,31 @@
   .modalcard h3{margin:0 0 6px;font-size:17px}
   .modalcard p{color:var(--muted);font-size:13px;margin:0 0 16px;line-height:1.5}
   .modalcard small{display:block;color:var(--muted);margin-top:12px;font-size:11.5px}
+  /* auth gate */
+  .auth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(1000px 500px at 50% -10%,rgba(109,139,255,.18),transparent),var(--bg);z-index:60}
+  .authcard{width:380px;max-width:92vw;background:var(--panel);border:1px solid var(--line);
+            border-radius:20px;padding:30px;box-shadow:0 30px 90px rgba(0,0,0,.55)}
+  .authcard .blogo{width:48px;height:48px;border-radius:14px;background:var(--grad);display:flex;
+        align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;box-shadow:0 8px 24px rgba(109,139,255,.45)}
+  .authcard h2{text-align:center;margin:0 0 2px;font-size:19px}
+  .authcard .tag{display:block;text-align:center;color:var(--muted);font-size:12px;margin-bottom:18px}
+  .authcard .field{margin-bottom:12px}
+  .authcard .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+  .authmsg{font-size:12.5px;margin:6px 0;min-height:16px}
+  .authswitch{text-align:center;font-size:12.5px;color:var(--muted);margin-top:14px}
+  .authswitch a{cursor:pointer}
+  .logout{font-size:12.5px;padding:8px 13px;border-radius:20px;cursor:pointer;font-weight:600;
+          background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  .logout:hover{color:var(--text)}
+  .approve{background:rgba(55,211,155,.15);color:var(--good);border:1px solid rgba(55,211,155,.35);
+           border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;margin-right:6px}
+  .reject{background:rgba(255,107,107,.12);color:var(--bad);border:1px solid rgba(255,107,107,.35);
+          border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .st{font-size:11px;padding:2px 8px;border-radius:6px}
+  .st.approved{background:rgba(55,211,155,.14);color:var(--good)}
+  .st.pending{background:rgba(255,180,84,.14);color:var(--warn)}
+  .st.rejected{background:rgba(255,107,107,.14);color:var(--bad)}
 </style>
 </head>
 <body>
@@ -150,7 +175,9 @@
       <h1 id="tabTitle">Generate a job</h1>
       <span class="pill">✓ 100% accurate · commands are generated, not guessed</span>
       <div class="spacer"></div>
+      <span class="badge" id="acct"></span>
       <button class="keychip" id="keyChip">🔒 Add Groq key</button>
+      <button class="logout" id="logoutBtn">Sign out</button>
     </div>
 
     <!-- GENERATE -->
@@ -179,6 +206,7 @@
             <div class="field">
               <label>Feature</label>
               <select id="feature"></select>
+              <input id="customName" placeholder="Name your custom feature (e.g. depth-estimator)" style="display:none;margin-top:8px" />
             </div>
             <div class="field">
               <label>GPUs (H100, 80&nbsp;GB VRAM each)</label>
@@ -244,6 +272,11 @@
     <!-- ADMIN -->
     <section class="view" id="view-admin">
       <div class="wrap">
+        <div class="card" id="adminUsersCard" style="display:none">
+          <h2>User access</h2>
+          <div class="sub">Approve or decline people who signed up. Approved users can sign in and use the app.</div>
+          <div id="adminUsers"></div>
+        </div>
         <div class="card">
           <h2>Overview</h2>
           <div class="sub">Aggregated from runs generated in this browser. For live cluster quota, run <code>r_quota -u rwth2125</code> on a login node.</div>
@@ -267,6 +300,23 @@
   </div>
 </div>
 
+<!-- Auth gate -->
+<div class="auth" id="authGate">
+  <div class="authcard">
+    <div class="blogo">⚡</div>
+    <h2 id="authTitle">Welcome back</h2>
+    <span class="tag" id="authTag">Sign in to the WestAI HPC Assistant</span>
+    <div class="field" id="nameField" style="display:none">
+      <label>Full name</label><input id="auName" placeholder="Jane Doe" />
+    </div>
+    <div class="field"><label>Email</label><input id="auEmail" type="email" placeholder="you@cloudbee.io" /></div>
+    <div class="field"><label>Password</label><input id="auPass" type="password" placeholder="••••••••" /></div>
+    <div class="authmsg" id="authMsg"></div>
+    <button class="btn primary" id="authBtn" style="width:100%">Sign in</button>
+    <div class="authswitch" id="authSwitch">New here? <a id="toSignup">Create an account</a></div>
+  </div>
+</div>
+
 <!-- Groq key modal: asked once, re-asked only when the key is rejected -->
 <div class="modal" id="keyModal">
   <div class="modalcard">
@@ -285,11 +335,22 @@
 <script>
 const $ = s => document.querySelector(s);
 const userSel=$('#user'), apikey=$('#apikey');
-const featureSel=$('#feature'), gpusSel=$('#gpus'), timeIn=$('#time'), labelIn=$('#label');
+const featureSel=$('#feature'), gpusSel=$('#gpus'), timeIn=$('#time'), labelIn=$('#label'), customName=$('#customName');
 const develTest=$('#develTest'), develWrap=$('#develWrap');
 const VRAM=80, RAM=122, CPU=24;
-let mode='development';
+let mode='development', me=null, featuresLoaded=false;
 const TITLES={generate:'Generate a job',assistant:'Assistant',history:'History',admin:'Admin overview'};
+
+/* ---- auth / token ---- */
+const tok=()=>localStorage.getItem('westai_token')||'';
+function api(path,opts={}){
+  opts.headers=Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+tok()},opts.headers||{});
+  return fetch(path,opts).then(async r=>{
+    if(r.status===401){logout();throw new Error('Session expired — please sign in again.');}
+    return r;
+  });
+}
+function logout(){localStorage.removeItem('westai_token');me=null;showAuth();}
 
 /* persistence */
 userSel.value=localStorage.getItem('user')||'mayur';
@@ -326,12 +387,20 @@ document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>{
   if(t==='assistant'&&!curKey().startsWith('gsk_'))openKeyModal('Add your Groq key once to use the Assistant.');
 });
 
-/* features */
-fetch('/api/features').then(r=>r.json()).then(d=>{
-  d.features.forEach(f=>{const o=document.createElement('option');o.value=f.key;o.textContent=f.label;featureSel.appendChild(o);});
-  featureSel.value=localStorage.getItem('feature')||'dataforge'; updateReadout();
-});
-featureSel.onchange=()=>{localStorage.setItem('feature',featureSel.value);};
+/* features (loaded after sign-in) */
+function loadFeatures(){
+  if(featuresLoaded)return;
+  api('/api/features').then(r=>r.json()).then(d=>{
+    d.features.forEach(f=>{const o=document.createElement('option');o.value=f.key;o.textContent=f.label;featureSel.appendChild(o);});
+    featureSel.value=localStorage.getItem('feature')||'dataforge'; featuresLoaded=true; toggleCustom(); updateReadout();
+  }).catch(()=>{});
+}
+function toggleCustom(){customName.style.display = featureSel.value==='custom' ? 'block':'none';}
+featureSel.onchange=()=>{localStorage.setItem('feature',featureSel.value);toggleCustom();};
+function effLabel(){
+  if(featureSel.value==='custom' && customName.value.trim()) return customName.value.trim();
+  return labelIn.value.trim() || featureSel.value;
+}
 
 /* mode segmented */
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{
@@ -377,12 +446,12 @@ $('#genBtn').onclick=async()=>{
   const body={user:userSel.value,feature:featureSel.value,mode,devel:develTest.checked,
               gpus:r.gpus||1,time:timeIn.value};
   try{
-    const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res=await api('/api/generate',{method:'POST',body:JSON.stringify(body)});
     const d=await res.json();
     if(d.error){showResult('Error',`<span class="err">${esc(d.error)}</span>`,null,d.script||'');return;}
     showResult(d.kind==='sbatch'?'sbatch script':'salloc command', '', d.resources, d.script);
     logRun({ts:Date.now(),user:userSel.value,mode,kind:d.kind,feature:featureSel.value,
-             label:labelIn.value||featureSel.value,run_id:'-',...d.resources});
+             label:effLabel(),run_id:'-',...d.resources});
   }catch(e){showResult('Error',`<span class="err">${esc(e.message)}</span>`,null,'');}
 };
 
@@ -414,22 +483,32 @@ $('#dlBtn').onclick=()=>{const c=$('#resultCode').textContent;
 
 /* bundle */
 $('#bundleBtn').onclick=async()=>{
-  const r=currentRes();
+  const g=+gpusSel.value, lbl=effLabel();
   try{
-    const res=await fetch('/api/bundle',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({feature:featureSel.value,user:userSel.value,gpus:(+gpusSel.value),
-        time:timeIn.value,label:labelIn.value||featureSel.value})});
+    const res=await api('/api/bundle',{method:'POST',
+      body:JSON.stringify({feature:featureSel.value,user:userSel.value,gpus:g,time:timeIn.value,label:lbl})});
     if(!res.ok){const e=await res.json();throw new Error(e.error||res.statusText);}
     const runId=res.headers.get('X-Run-Id')||'-';
-    const blob=await res.blob();
-    saveBlob(blob,(labelIn.value||featureSel.value)+'_'+runId+'.zip');
+    const zipName=lbl+'_'+runId+'.zip', folder=lbl+'_'+runId;
+    saveBlob(await res.blob(),zipName);
     logRun({ts:Date.now(),user:userSel.value,mode:'production',kind:'bundle',feature:featureSel.value,
-            label:labelIn.value||featureSel.value,run_id:runId,
-            machine:'c23g · H100',gpus:+gpusSel.value,vram_gb:(+gpusSel.value)*VRAM,
-            ram_gb:(+gpusSel.value)*RAM,cpus:(+gpusSel.value)*CPU,time:timeIn.value,hours:hours(timeIn.value)});
-    showResult('Bundle downloaded','📦 <b>'+(labelIn.value||featureSel.value)+'_'+runId+'.zip</b> → unzip, then on laptop <code>./scripts/local_setup.sh</code> (pushes to your <b>'+userSel.value+'</b> branch), on HPC <code>./scripts/hpc_pull_run.sh</code>.',
-      {machine:'c23g · H100',vram_gb:(+gpusSel.value)*VRAM,ram_gb:(+gpusSel.value)*RAM,cpus:(+gpusSel.value)*CPU,time:timeIn.value},'');
-    $('#resultCode').parentElement.style.display='none';
+            label:lbl,run_id:runId,machine:'c23g · H100',gpus:g,vram_gb:g*VRAM,
+            ram_gb:g*RAM,cpus:g*CPU,time:timeIn.value,hours:hours(timeIn.value)});
+    const steps=
+      '📦 Downloaded <b>'+zipName+'</b>. Here\'s how to use it:<br><br>'+
+      '<b>1 · On your laptop</b> — unzip and push it to your branch:<br>'+
+      '<b>2 · On an HPC login node</b> — pull your branch and submit the job.<br>'+
+      'The two commands below do exactly that (run #1 locally, #2 on the cluster):';
+    showResult('Bundle ready', steps,
+      {machine:'c23g · H100',vram_gb:g*VRAM,ram_gb:g*RAM,cpus:g*CPU,time:timeIn.value},
+      '# 1) LAPTOP — in your terminal, where the zip downloaded:\n'+
+      'unzip '+zipName+'\n'+
+      'cd '+folder+'\n'+
+      './scripts/local_setup.sh          # commits + pushes to the "'+userSel.value+'" branch\n\n'+
+      '# 2) HPC LOGIN NODE — after SSHing in:\n'+
+      './scripts/hpc_pull_run.sh         # pulls your branch, runs sbatch, shows the queue\n\n'+
+      '# monitor:  squeue --me');
+    $('#dlBtn').style.display='none';
   }catch(e){showResult('Error',`<span class="err">${esc(e.message)}</span>`,null,'');}
 };
 
@@ -463,8 +542,30 @@ function renderAdmin(){
   Object.keys(by).forEach(u=>h+=`<tr><td>${esc(u)}</td><td>${by[u].n}</td><td>${by[u].g.toFixed(1)}</td><td>${by[u].v} GB</td></tr>`);
   if(!Object.keys(by).length)h+='<tr><td colspan="4" class="empty">No data yet.</td></tr>';
   $('#adminByUser').innerHTML=h+'</table>';
+  if(me&&me.role==='admin')loadAdminUsers();
 }
 const stat=(n,l)=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+
+/* admin: user access management */
+function loadAdminUsers(){
+  $('#adminUsersCard').style.display='block';
+  api('/api/admin/users').then(r=>r.json()).then(d=>{
+    if(!d.users)return;
+    let h='<table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr>';
+    d.users.forEach(u=>{
+      const act = u.role==='admin' ? '<span class="badge">—</span>' :
+        `<button class="approve" data-id="${u.id}" data-s="approved">Approve</button>`+
+        `<button class="reject" data-id="${u.id}" data-s="rejected">Decline</button>`;
+      h+=`<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role}</td>
+          <td><span class="st ${u.status}">${u.status}</span></td><td>${act}</td></tr>`;
+    });
+    $('#adminUsers').innerHTML=h+'</table>';
+    document.querySelectorAll('#adminUsers .approve,#adminUsers .reject').forEach(b=>b.onclick=()=>{
+      api('/api/admin/set_status',{method:'POST',body:JSON.stringify({id:b.dataset.id,status:b.dataset.s})})
+        .then(()=>loadAdminUsers());
+    });
+  }).catch(()=>{});
+}
 
 /* assistant chat */
 const chat=$('#chat'),chatInput=$('#chatInput');let chatHist=[];
@@ -479,7 +580,7 @@ function addMsg(role,text){const w=document.createElement('div');w.className='ms
 async function send(){const t=chatInput.value.trim();const k=curKey();if(!t)return;
   if(!k.startsWith('gsk_')){openKeyModal('Add your Groq key once to use the Assistant.');return;}
   chatInput.value='';addMsg('user',t);const th=addMsg('bot','…thinking');
-  try{const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+  try{const res=await api('/api/chat',{method:'POST',
     body:JSON.stringify({api_key:k,message:t,history:chatHist,user:userSel.value,feature:featureSel.value})});
     const d=await res.json();th.remove();
     if(d.error){
@@ -493,6 +594,57 @@ $('#sendBtn').onclick=send;
 chatInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 document.querySelectorAll('.chip.ex').forEach(c=>c.onclick=()=>{chatInput.value=c.textContent;chatInput.focus();});
 addMsg('bot',"Hi! I'm the **WestAI** assistant. Use the **Generate** tab for guaranteed-correct commands; ask me here about CLAIX storage, data transfer, modules, GPU/CUDA — grounded on the official RWTH docs.");
+
+/* ---- auth gate ---- */
+const authGate=$('#authGate'), appEl=$('.app');
+let authMode='login';
+function showAuth(msg){authGate.style.display='flex';appEl.style.display='none';
+  $('#logoutBtn').style.display='none';
+  if(msg){$('#authMsg').className='authmsg err';$('#authMsg').textContent=msg;}}
+function showApp(u){me=u;authGate.style.display='none';appEl.style.display='flex';
+  $('#logoutBtn').style.display='inline-block';
+  $('#acct').textContent=u.name+(u.role==='admin'?' · admin':'');
+  loadFeatures();renderHistory();}
+function setAuthMode(m){authMode=m;
+  $('#authTitle').textContent=m==='login'?'Welcome back':'Create your account';
+  $('#authTag').textContent=m==='login'?'Sign in to the WestAI HPC Assistant':'Sign up — an admin approves new accounts';
+  $('#nameField').style.display=m==='login'?'none':'block';
+  $('#authBtn').textContent=m==='login'?'Sign in':'Create account';
+  $('#authSwitch').innerHTML=m==='login'?'New here? <a id="toSignup">Create an account</a>':'Have an account? <a id="toLogin">Sign in</a>';
+  wireSwitch(); $('#authMsg').textContent='';}
+function wireSwitch(){const a=$('#toSignup');if(a)a.onclick=()=>setAuthMode('signup');
+  const b=$('#toLogin');if(b)b.onclick=()=>setAuthMode('login');}
+$('#authBtn').onclick=async()=>{
+  const email=$('#auEmail').value.trim(),pass=$('#auPass').value,name=$('#auName').value.trim();
+  const msg=$('#authMsg');msg.className='authmsg';msg.style.color='';
+  try{
+    if(authMode==='signup'){
+      const r=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,email,password:pass})});
+      const d=await r.json();
+      if(d.error){msg.className='authmsg err';msg.textContent=d.error;return;}
+      msg.style.color='var(--good)';msg.textContent=d.message;
+      if(d.status==='approved')setAuthMode('login');
+    }else{
+      const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,password:pass})});
+      const d=await r.json();
+      if(d.error){msg.className='authmsg err';msg.textContent=d.error;return;}
+      localStorage.setItem('westai_token',d.token);showApp(d.user);
+    }
+  }catch(e){msg.className='authmsg err';msg.textContent=e.message;}
+};
+$('#auPass').addEventListener('keydown',e=>{if(e.key==='Enter')$('#authBtn').click();});
+$('#logoutBtn').onclick=logout;
+wireSwitch();
+
+/* boot */
+(function boot(){
+  if(!tok()){showAuth();return;}
+  fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+tok()}})
+    .then(r=>r.ok?r.json():null).then(u=>{u&&u.id?showApp(u):showAuth();})
+    .catch(()=>showAuth());
+})();
 </script>
 </body>
 </html>

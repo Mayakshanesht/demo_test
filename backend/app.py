@@ -14,7 +14,7 @@ import json
 import os
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +24,7 @@ import slurm_gen as sg
 import features as ft
 import rag
 import bundle
+import auth
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
@@ -40,6 +41,71 @@ app = FastAPI(title="WestAI HPC Assistant")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
+
+
+# --- auth dependencies ------------------------------------------------------
+def require_user(authorization: str = Header(default="")):
+    token = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+    payload = auth.verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return payload
+
+
+def require_admin(user=Depends(require_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return user
+
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class StatusRequest(BaseModel):
+    id: str
+    status: str
+
+
+@app.post("/api/auth/signup")
+def auth_signup(req: SignupRequest):
+    try:
+        return auth.signup(req.name, req.email, req.password)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/auth/login")
+def auth_login(req: LoginRequest):
+    try:
+        return auth.login(req.email, req.password)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/auth/me")
+def auth_me(user=Depends(require_user)):
+    return auth.get_user(user["uid"]) or JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.get("/api/admin/users")
+def admin_users(_=Depends(require_admin)):
+    return {"users": auth.list_users()}
+
+
+@app.post("/api/admin/set_status")
+def admin_set_status(req: StatusRequest, _=Depends(require_admin)):
+    try:
+        return auth.set_status(req.id, req.status)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 class ChatRequest(BaseModel):
@@ -122,7 +188,7 @@ def call_groq(api_key: str, model: str, messages: list, use_tools=True):
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, _=Depends(require_user)):
     if not req.api_key.strip():
         return JSONResponse({"error": "Missing Groq API key."}, status_code=400)
 
@@ -191,13 +257,13 @@ def health():
 
 
 @app.get("/api/features")
-def features_list():
+def features_list(_=Depends(require_user)):
     """For the UI dropdown: feature catalog + team members."""
     return {"features": ft.list_features(), "team": list(sg.TEAM.keys())}
 
 
 @app.post("/api/scaffold")
-def scaffold(req: ScaffoldRequest):
+def scaffold(req: ScaffoldRequest, _=Depends(require_user)):
     """Deterministic form path — no LLM, no API key needed."""
     try:
         return {"script": ft.scaffold_feature(req.feature, req.user,
@@ -207,7 +273,7 @@ def scaffold(req: ScaffoldRequest):
 
 
 @app.post("/api/generate")
-def generate(req: GenerateRequest):
+def generate(req: GenerateRequest, _=Depends(require_user)):
     """Deterministic, mode-aware: development -> salloc, production -> sbatch."""
     try:
         if req.mode == "production":
@@ -230,7 +296,7 @@ def generate(req: GenerateRequest):
 
 
 @app.post("/api/bundle")
-def make_bundle(req: BundleRequest):
+def make_bundle(req: BundleRequest, _=Depends(require_user)):
     """Return a downloadable .zip run folder (job + git-push + pull-run)."""
     try:
         name, data, meta = bundle.build_bundle(
